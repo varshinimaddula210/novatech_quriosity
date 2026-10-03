@@ -1,0 +1,33 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --bg: #0a0a0f;
+  --surface: #13131a;
+  --accent: #7c3aed;
+  --accent-light: #a78bfa;
+  --text: #f1f0ff;
+  --text-muted: #6b7280;
+  --danger: #ef4444;
+  --success: #22c55e;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#app {
+  width: 100%;
+  max-width: 720px;
+  padding: 2rem;
+  text-align: center;
+}
