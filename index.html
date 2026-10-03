@@ -3,129 +3,140 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Basis Switching — Quriosity 2026</title>
+    <title>Quantum Cop — Quriosity 2026</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
 
-    <!-- ── SCREEN: START ─────────────────────────── -->
+    <!-- ── START ─────────────────────────────── -->
     <div id="screen-start" class="screen active">
       <div class="card">
-        <div class="qubit-icon">⟨ψ⟩</div>
-        <h1>Basis Switching</h1>
-        <p class="subtitle">A qubit is hiding a secret.<br>Ask it the right question to reveal it.<br>Ask the wrong one — and it forgets.</p>
-        <button id="btn-start" class="btn btn-primary">Start Game</button>
+        <div class="badge">QURIOSITY 2026</div>
+        <h1>Quantum Cop</h1>
+        <p class="subtitle">
+          A thief is hiding on the grid.<br>
+          Read the footprints. Pick the right basis.<br>
+          Scan the right line — or watch them vanish.
+        </p>
+        <button id="btn-start" class="btn btn-primary">Start Chase</button>
         <button id="btn-how" class="btn btn-ghost">How to Play</button>
       </div>
     </div>
 
-    <!-- ── SCREEN: HOW TO PLAY ───────────────────── -->
+    <!-- ── HOW TO PLAY ────────────────────────── -->
     <div id="screen-how" class="screen">
       <div class="card card-wide">
         <h2>How to Play</h2>
         <div class="rules">
           <div class="rule">
-            <span class="rule-icon">🎯</span>
-            <div>
-              <strong>Your goal:</strong> Reveal the qubit's secret value (0 or 1) by measuring it in the correct basis.
-            </div>
+            <span class="rule-icon">🦶</span>
+            <div><strong>Read the footprints.</strong> Footprints going <em>up-down</em> mean the thief moves vertically. Footprints going <em>left-right</em> mean horizontal movement.</div>
           </div>
           <div class="rule">
             <span class="rule-icon">🧭</span>
-            <div>
-              <strong>Two bases:</strong> The <em>Z-basis</em> reads vertical spin (↑↓). The <em>X-basis</em> reads horizontal spin (←→). Each qubit is prepared in one of them.
-            </div>
+            <div><strong>Pick your basis.</strong> Z-basis scans a full <em>row</em> (vertical read). X-basis scans a full <em>column</em> (horizontal read).</div>
           </div>
           <div class="rule">
-            <span class="rule-icon">✅</span>
-            <div>
-              <strong>Right basis:</strong> You get the true value — 0 or 1. The secret is revealed.
-            </div>
+            <span class="rule-icon">🔦</span>
+            <div><strong>Choose a line.</strong> Click a row number (Z) or column number (X) to scan it. If the thief is there — caught!</div>
           </div>
           <div class="rule">
             <span class="rule-icon">💥</span>
-            <div>
-              <strong>Wrong basis:</strong> The qubit collapses into a random state. You get noise, not signal — and lose a life. This is measurement scrambling.
-            </div>
+            <div><strong>Wrong basis?</strong> The thief's quantum state collapses. They teleport to a random cell, footprints scramble, and you lose a scan.</div>
           </div>
           <div class="rule">
-            <span class="rule-icon">🔍</span>
-            <div>
-              <strong>Clues:</strong> Each round gives you a context clue. Read it carefully — it hints at which basis the secret is encoded in.
-            </div>
+            <span class="rule-icon">⚡</span>
+            <div><strong>You have 5 scans.</strong> Use them wisely. Run out and the thief escapes.</div>
           </div>
         </div>
         <button id="btn-back" class="btn btn-ghost">← Back</button>
       </div>
     </div>
 
-    <!-- ── SCREEN: GAME ──────────────────────────── -->
+    <!-- ── GAME ───────────────────────────────── -->
     <div id="screen-game" class="screen">
+
       <div class="hud">
         <div class="hud-item">
           <span class="hud-label">Round</span>
-          <span id="hud-round" class="hud-value">1 / 7</span>
+          <span id="hud-round" class="hud-value">1</span>
+        </div>
+        <div class="hud-item">
+          <span class="hud-label">Scans left</span>
+          <span id="hud-scans" class="hud-value">5</span>
         </div>
         <div class="hud-item">
           <span class="hud-label">Score</span>
           <span id="hud-score" class="hud-value">0</span>
         </div>
-        <div class="hud-item">
-          <span class="hud-label">Lives</span>
-          <span id="hud-lives" class="hud-value">❤️❤️❤️</span>
-        </div>
       </div>
 
       <div class="card game-card">
-        <!-- Qubit visual -->
-        <div class="qubit-display">
-          <div id="qubit-orb" class="qubit-orb">
-            <div class="qubit-inner">?</div>
+
+        <!-- status message -->
+        <div id="status-msg" class="status-msg">Read the footprints, then choose your basis.</div>
+
+        <!-- grid -->
+        <div class="grid-wrap">
+          <!-- col labels -->
+          <div class="col-labels" id="col-labels"></div>
+          <div class="grid-row-wrap">
+            <!-- row labels -->
+            <div class="row-labels" id="row-labels"></div>
+            <!-- main grid -->
+            <div id="grid" class="grid"></div>
           </div>
-          <div id="qubit-label" class="qubit-label">Qubit in superposition</div>
         </div>
 
-        <!-- Clue -->
-        <div class="clue-box">
-          <span class="clue-tag">CLUE</span>
-          <p id="clue-text" class="clue-text"></p>
+        <!-- basis selector -->
+        <div class="basis-section">
+          <p class="basis-prompt">Choose your measurement basis:</p>
+          <div class="basis-buttons">
+            <button id="btn-z" class="btn btn-basis" data-basis="Z">
+              <span class="basis-symbol">↕</span>
+              <span class="basis-name">Z-basis</span>
+              <span class="basis-desc">Scan a row</span>
+            </button>
+            <button id="btn-x" class="btn btn-basis" data-basis="X">
+              <span class="basis-symbol">↔</span>
+              <span class="basis-name">X-basis</span>
+              <span class="basis-desc">Scan a column</span>
+            </button>
+          </div>
         </div>
 
-        <!-- Basis choice -->
-        <div id="basis-buttons" class="basis-buttons">
-          <button id="btn-z" class="btn btn-basis" data-basis="Z">
-            <span class="basis-symbol">↕</span>
-            <span class="basis-name">Z-basis</span>
-            <span class="basis-desc">Vertical spin</span>
-          </button>
-          <button id="btn-x" class="btn btn-basis" data-basis="X">
-            <span class="basis-symbol">↔</span>
-            <span class="basis-name">X-basis</span>
-            <span class="basis-desc">Horizontal spin</span>
-          </button>
+        <!-- scan line selector — shown after basis picked -->
+        <div id="scan-selector" class="scan-selector hidden">
+          <p id="scan-prompt" class="basis-prompt"></p>
+          <div id="scan-buttons" class="scan-buttons"></div>
+          <button id="btn-cancel" class="btn btn-ghost-sm">← Change basis</button>
         </div>
 
-        <!-- Result -->
-        <div id="result-box" class="result-box hidden">
-          <div id="result-icon" class="result-icon"></div>
-          <div id="result-title" class="result-title"></div>
-          <div id="result-explanation" class="result-explanation"></div>
-          <button id="btn-next" class="btn btn-primary">Next Round →</button>
-        </div>
       </div>
     </div>
 
-    <!-- ── SCREEN: GAME OVER ─────────────────────── -->
+    <!-- ── ROUND RESULT ───────────────────────── -->
+    <div id="screen-result" class="screen">
+      <div class="card">
+        <div id="res-icon" class="big-icon"></div>
+        <h2 id="res-title"></h2>
+        <p id="res-msg" class="subtitle"></p>
+        <div class="physics-note" id="res-physics"></div>
+        <button id="btn-next-round" class="btn btn-primary">Next Round →</button>
+      </div>
+    </div>
+
+    <!-- ── GAME OVER ───────────────────────────── -->
     <div id="screen-gameover" class="screen">
       <div class="card">
-        <div class="result-icon" id="gameover-icon"></div>
-        <h2 id="gameover-title"></h2>
-        <p id="gameover-msg"></p>
+        <div id="go-icon" class="big-icon"></div>
+        <h2 id="go-title"></h2>
+        <p id="go-msg" class="subtitle"></p>
         <div class="final-score-box">
           <span class="final-score-label">Final Score</span>
           <span id="final-score" class="final-score-value"></span>
         </div>
-        <div class="physics-note" id="physics-note"></div>
+        <div class="physics-note" id="go-physics"></div>
         <button id="btn-restart" class="btn btn-primary">Play Again</button>
       </div>
     </div>

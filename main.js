@@ -1,117 +1,62 @@
 // ─────────────────────────────────────────────────────────────
-// Basis Switching — Quriosity 2026
-// Mechanic: A qubit encodes a secret in a specific basis.
-// Measure in the right basis → secret revealed.
-// Measure in the wrong basis → state collapses randomly, life lost.
+// Quantum Cop — Quriosity 2026
+//
+// Mechanic: A thief hides on a 5×5 grid, encoded in a basis.
+// Footprints hint at which basis (Z=vertical, X=horizontal).
+// Scan the right line in the right basis → caught.
+// Wrong basis → state collapses, thief teleports, scan wasted.
 // ─────────────────────────────────────────────────────────────
 
-// ── Rounds data ───────────────────────────────────────────────
-// Each round has:
-//   basis      : 'Z' or 'X' — the correct basis to measure in
-//   value      : '0' or '1' — the secret encoded in the qubit
-//   clue       : hint that guides the player toward the right basis
-//   rightMsg   : feedback shown when player picks correctly
-//   wrongMsg   : feedback shown when player picks wrong basis
+const GRID_SIZE  = 5;
+const MAX_SCANS  = 5;
+const MAX_ROUNDS = 5;
 
-const ROUNDS = [
-  {
-    basis: 'Z',
-    value: '0',
-    clue: 'The qubit was prepared by aligning it with Earth\'s gravitational field — straight up and down. Think about which axis that is.',
-    rightMsg: 'The qubit was encoded vertically (↕). The Z-basis reads vertical spin, so you got the true value: |0⟩.',
-    wrongMsg: 'The qubit was vertical, but you asked a horizontal question. It had no answer — so it picked randomly. The original state collapsed.',
-  },
-  {
-    basis: 'X',
-    value: '1',
-    clue: 'This qubit was prepared facing the rising sun — pointing along the horizon, left to right. Which basis captures that direction?',
-    rightMsg: 'The qubit was encoded horizontally (↔). The X-basis reads horizontal spin. You asked the right question and got |1⟩.',
-    wrongMsg: 'The qubit was horizontal, but the Z-basis only knows up or down. It couldn\'t answer honestly — it collapsed into a random state.',
-  },
-  {
-    basis: 'Z',
-    value: '1',
-    clue: 'The qubit was set by a compass needle pointing straight down into the ground — a vertical measurement.',
-    rightMsg: 'Vertical encoding, vertical question. The Z-basis revealed the true state: |1⟩. Perfect alignment.',
-    wrongMsg: 'You asked left-or-right, but the qubit only knew up-or-down. Incompatible bases scrambled the result.',
-  },
-  {
-    basis: 'X',
-    value: '0',
-    clue: 'This qubit was prepared like the hands of a clock at 9 and 3 — perfectly horizontal, east to west.',
-    rightMsg: 'The X-basis reads horizontal spin. Your question matched the encoding. The true value |0⟩ is revealed.',
-    wrongMsg: 'The qubit knew left-right, but you asked up-down. The bases were incompatible — your measurement destroyed the original state.',
-  },
-  {
-    basis: 'Z',
-    value: '0',
-    clue: 'The qubit was aligned using a plumb line hanging from the ceiling — perfectly vertical.',
-    rightMsg: 'A vertical qubit, measured vertically. The Z-basis gave you the true answer: |0⟩.',
-    wrongMsg: 'Asking a horizontal question about a vertical state is like measuring height with a ruler held sideways. The qubit gave up a random answer.',
-  },
-  {
-    basis: 'X',
-    value: '1',
-    clue: 'This qubit was set using a spirit level — the kind that tells you something is perfectly flat, left to right.',
-    rightMsg: 'Horizontal encoding, horizontal question. The X-basis matched and revealed |1⟩.',
-    wrongMsg: 'The Z-basis only knows vertical. It couldn\'t read a horizontal qubit — the state was scrambled on contact.',
-  },
-  {
-    basis: 'Z',
-    value: '1',
-    clue: 'Final round. The qubit was prepared by a laser pointed straight at the sky — no tilt, purely vertical.',
-    rightMsg: 'Last one. Z-basis for a vertical qubit — you matched the encoding and revealed the true value |1⟩. Well played.',
-    wrongMsg: 'So close. The qubit was vertical and the X-basis is horizontal. One last incompatibility — the state collapsed.',
-  },
-];
-
-const TOTAL_ROUNDS = ROUNDS.length;
-const MAX_LIVES    = 3;
-
-// ── State ─────────────────────────────────────────────────────
-let state = {
-  round:       0,
-  score:       0,
-  lives:       MAX_LIVES,
-  answered:    false,
-};
+// ── Game state ────────────────────────────────────────────────
+let state = {};
 
 // ── DOM refs ──────────────────────────────────────────────────
 const screens = {
   start:    document.getElementById('screen-start'),
   how:      document.getElementById('screen-how'),
   game:     document.getElementById('screen-game'),
+  result:   document.getElementById('screen-result'),
   gameover: document.getElementById('screen-gameover'),
 };
 
 const el = {
-  btnStart:      document.getElementById('btn-start'),
-  btnHow:        document.getElementById('btn-how'),
-  btnBack:       document.getElementById('btn-back'),
-  btnZ:          document.getElementById('btn-z'),
-  btnX:          document.getElementById('btn-x'),
-  btnNext:       document.getElementById('btn-next'),
-  btnRestart:    document.getElementById('btn-restart'),
+  btnStart:     document.getElementById('btn-start'),
+  btnHow:       document.getElementById('btn-how'),
+  btnBack:      document.getElementById('btn-back'),
+  btnZ:         document.getElementById('btn-z'),
+  btnX:         document.getElementById('btn-x'),
+  btnCancel:    document.getElementById('btn-cancel'),
+  btnNextRound: document.getElementById('btn-next-round'),
+  btnRestart:   document.getElementById('btn-restart'),
 
-  hudRound:      document.getElementById('hud-round'),
-  hudScore:      document.getElementById('hud-score'),
-  hudLives:      document.getElementById('hud-lives'),
+  hudRound:     document.getElementById('hud-round'),
+  hudScans:     document.getElementById('hud-scans'),
+  hudScore:     document.getElementById('hud-score'),
 
-  qubitOrb:      document.getElementById('qubit-orb'),
-  qubitInner:    document.querySelector('#qubit-orb .qubit-inner'),
-  qubitLabel:    document.getElementById('qubit-label'),
-  clueText:      document.getElementById('clue-text'),
+  statusMsg:    document.getElementById('status-msg'),
+  grid:         document.getElementById('grid'),
+  colLabels:    document.getElementById('col-labels'),
+  rowLabels:    document.getElementById('row-labels'),
 
-  resultBox:     document.getElementById('result-box'),
-  resultIcon:    document.getElementById('result-icon'),
-  resultTitle:   document.getElementById('result-title'),
-  resultExpl:    document.getElementById('result-explanation'),
+  basisSection: document.querySelector('.basis-section'),
+  scanSelector: document.getElementById('scan-selector'),
+  scanPrompt:   document.getElementById('scan-prompt'),
+  scanButtons:  document.getElementById('scan-buttons'),
 
-  gameoverIcon:  document.getElementById('gameover-icon'),
-  gameoverTitle: document.getElementById('gameover-title'),
-  gameoverMsg:   document.getElementById('gameover-msg'),
-  finalScore:    document.getElementById('final-score'),
-  physicsNote:   document.getElementById('physics-note'),
+  resIcon:      document.getElementById('res-icon'),
+  resTitle:     document.getElementById('res-title'),
+  resMsg:       document.getElementById('res-msg'),
+  resPhysics:   document.getElementById('res-physics'),
+
+  goIcon:       document.getElementById('go-icon'),
+  goTitle:      document.getElementById('go-title'),
+  goMsg:        document.getElementById('go-msg'),
+  goPhysics:    document.getElementById('go-physics'),
+  finalScore:   document.getElementById('final-score'),
 };
 
 // ── Screen navigation ─────────────────────────────────────────
@@ -120,167 +65,374 @@ function showScreen(name) {
   screens[name].classList.add('active');
 }
 
-// ── Lives display ─────────────────────────────────────────────
-function renderLives(lives) {
-  return '❤️'.repeat(lives) + '🖤'.repeat(MAX_LIVES - lives);
+// ── Utility ───────────────────────────────────────────────────
+function rand(n) { return Math.floor(Math.random() * n); }
+
+function cellIndex(row, col) { return row * GRID_SIZE + col; }
+
+// ── Generate footprints ───────────────────────────────────────
+// Places footprint trail hinting at thief's basis.
+// Z-basis (vertical):   footprints in thief's column, above/below
+// X-basis (horizontal): footprints in thief's row, left/right
+function generateFootprints(thief, basis) {
+  const prints = new Set();
+
+  if (basis === 'Z') {
+    // vertical trail — 2–3 cells in same column, excluding thief cell
+    const col = thief.col;
+    const rows = [...Array(GRID_SIZE).keys()].filter(r => r !== thief.row);
+    shuffle(rows);
+    rows.slice(0, 3).forEach(r => prints.add(cellIndex(r, col)));
+  } else {
+    // horizontal trail — 2–3 cells in same row, excluding thief cell
+    const row = thief.row;
+    const cols = [...Array(GRID_SIZE).keys()].filter(c => c !== thief.col);
+    shuffle(cols);
+    cols.slice(0, 3).forEach(c => prints.add(cellIndex(row, c)));
+  }
+
+  return prints;
 }
 
-// ── Load a round ──────────────────────────────────────────────
-function loadRound() {
-  const round = ROUNDS[state.round];
-  state.answered = false;
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = rand(i + 1);
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
 
-  // HUD
-  el.hudRound.textContent = `${state.round + 1} / ${TOTAL_ROUNDS}`;
+// ── Init round ────────────────────────────────────────────────
+function initRound() {
+  state.thief      = { row: rand(GRID_SIZE), col: rand(GRID_SIZE) };
+  state.basis      = Math.random() < 0.5 ? 'Z' : 'X';
+  state.footprints = generateFootprints(state.thief, state.basis);
+  state.scansLeft  = MAX_SCANS;
+  state.selectedBasis = null;
+  state.roundOver  = false;
+
+  renderHUD();
+  renderGrid();
+  renderLabels();
+  showBasisSelector();
+  setStatus('Read the footprints. Then choose your measurement basis.');
+}
+
+// ── Render HUD ────────────────────────────────────────────────
+function renderHUD() {
+  el.hudRound.textContent = `${state.round} / ${MAX_ROUNDS}`;
+  el.hudScans.textContent = state.scansLeft;
   el.hudScore.textContent = state.score;
-  el.hudLives.textContent = renderLives(state.lives);
+}
 
-  // Qubit orb — reset to superposition
-  el.qubitOrb.className   = 'qubit-orb';
-  el.qubitInner.textContent = '?';
-  el.qubitLabel.textContent = 'Qubit in superposition';
+// ── Render grid ───────────────────────────────────────────────
+function renderGrid() {
+  el.grid.innerHTML = '';
 
-  // Clue
-  el.clueText.textContent = round.clue;
+  for (let r = 0; r < GRID_SIZE; r++) {
+    for (let c = 0; c < GRID_SIZE; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.dataset.row = r;
+      cell.dataset.col = c;
 
-  // Basis buttons — re-enable
+      if (state.footprints.has(cellIndex(r, c))) {
+        cell.classList.add(state.basis === 'Z' ? 'footprint-v' : 'footprint-h');
+      }
+
+      el.grid.appendChild(cell);
+    }
+  }
+}
+
+// ── Render row/col labels ─────────────────────────────────────
+function renderLabels() {
+  el.colLabels.innerHTML = '';
+  el.rowLabels.innerHTML = '';
+
+  for (let i = 0; i < GRID_SIZE; i++) {
+    const col = document.createElement('div');
+    col.className = 'col-label';
+    col.textContent = `C${i + 1}`;
+    col.dataset.col = i;
+    el.colLabels.appendChild(col);
+
+    const row = document.createElement('div');
+    row.className = 'row-label';
+    row.textContent = `R${i + 1}`;
+    row.dataset.row = i;
+    el.rowLabels.appendChild(row);
+  }
+}
+
+// ── Status message ────────────────────────────────────────────
+function setStatus(msg, type = 'default') {
+  el.statusMsg.textContent = msg;
+  el.statusMsg.style.color = type === 'error' ? 'var(--danger)'
+    : type === 'success' ? 'var(--success)'
+    : 'var(--accent-light)';
+  el.statusMsg.style.borderColor = type === 'error' ? 'rgba(239,68,68,0.3)'
+    : type === 'success' ? 'rgba(34,197,94,0.3)'
+    : 'rgba(124,58,237,0.2)';
+  el.statusMsg.style.background = type === 'error' ? 'rgba(239,68,68,0.07)'
+    : type === 'success' ? 'rgba(34,197,94,0.07)'
+    : 'rgba(124,58,237,0.08)';
+}
+
+// ── Show basis selector ───────────────────────────────────────
+function showBasisSelector() {
+  el.basisSection.style.display = 'flex';
+  el.scanSelector.classList.add('hidden');
   el.btnZ.disabled = false;
   el.btnX.disabled = false;
-
-  // Hide result
-  el.resultBox.classList.add('hidden');
-  el.resultBox.className = 'result-box hidden';
 }
 
-// ── Handle measurement ────────────────────────────────────────
-function measure(chosenBasis) {
-  if (state.answered) return;
-  state.answered = true;
+// ── Player picks a basis ──────────────────────────────────────
+function pickBasis(basis) {
+  if (state.roundOver) return;
+  state.selectedBasis = basis;
 
-  const round   = ROUNDS[state.round];
-  const correct = chosenBasis === round.basis;
+  // hide basis buttons, show line selector
+  el.basisSection.style.display = 'none';
+  el.scanSelector.classList.remove('hidden');
 
-  // Disable buttons
-  el.btnZ.disabled = true;
-  el.btnX.disabled = true;
+  if (basis === 'Z') {
+    el.scanPrompt.textContent = 'Z-basis selected — pick a ROW to scan (↕)';
+    el.scanPrompt.style.color = 'var(--z-color)';
+  } else {
+    el.scanPrompt.textContent = 'X-basis selected — pick a COLUMN to scan (↔)';
+    el.scanPrompt.style.color = 'var(--x-color)';
+  }
+
+  // build scan buttons
+  el.scanButtons.innerHTML = '';
+  for (let i = 0; i < GRID_SIZE; i++) {
+    const btn = document.createElement('button');
+    btn.className = `btn-scan ${basis === 'Z' ? 'z-scan' : 'x-scan'}`;
+    btn.textContent = basis === 'Z' ? `R${i + 1}` : `C${i + 1}`;
+    btn.dataset.index = i;
+    btn.addEventListener('click', () => scan(i));
+    el.scanButtons.appendChild(btn);
+  }
+
+  // highlight the relevant lines on grid
+  clearHighlights();
+}
+
+// ── Highlight row or column ───────────────────────────────────
+function highlightLine(index, basis) {
+  clearHighlights();
+  const cells = el.grid.querySelectorAll('.cell');
+  cells.forEach(cell => {
+    const r = parseInt(cell.dataset.row);
+    const c = parseInt(cell.dataset.col);
+    if (basis === 'Z' && r === index) cell.classList.add('scan-highlight');
+    if (basis === 'X' && c === index) cell.classList.add('scan-highlight-col');
+  });
+}
+
+function clearHighlights() {
+  el.grid.querySelectorAll('.cell').forEach(cell => {
+    cell.classList.remove('scan-highlight', 'scan-highlight-col');
+  });
+}
+
+// ── Execute scan ──────────────────────────────────────────────
+function scan(index) {
+  if (state.roundOver) return;
+
+  const chosen = state.selectedBasis;
+  const correct = chosen === state.basis;
+
+  highlightLine(index, chosen);
+  state.scansLeft -= 1;
+  renderHUD();
 
   if (correct) {
-    // Right basis — reveal true value
-    state.score += 100 + (state.lives * 10); // bonus for lives remaining
+    // right basis — check if thief is in this line
+    const thief = state.thief;
+    const inLine = (chosen === 'Z' && thief.row === index)
+                || (chosen === 'X' && thief.col === index);
 
-    el.qubitOrb.classList.add('correct');
-    el.qubitInner.textContent = `|${round.value}⟩`;
-    el.qubitLabel.textContent = `Measured in ${round.basis}-basis → |${round.value}⟩`;
+    if (inLine) {
+      // CAUGHT
+      const thief = state.thief;
+      const caughtCell = el.grid.querySelector(
+        `.cell[data-row="${thief.row}"][data-col="${thief.col}"]`
+      );
+      caughtCell.textContent = '🦹';
+      caughtCell.classList.add('caught');
 
-    el.resultIcon.textContent  = '✅';
-    el.resultTitle.textContent = `Correct! You chose the ${chosenBasis}-basis.`;
-    el.resultTitle.style.color = 'var(--success)';
-    el.resultExpl.textContent  = round.rightMsg;
+      const scoreGain = 100 + state.scansLeft * 20;
+      state.score += scoreGain;
+      renderHUD();
+      setStatus(`🎉 Got them! +${scoreGain} points`, 'success');
+
+      state.roundOver = true;
+      el.basisSection.style.display = 'none';
+      el.scanSelector.classList.add('hidden');
+
+      setTimeout(() => showRoundResult(true), 1000);
+
+    } else {
+      // right basis, wrong line — no teleport, just miss
+      setStatus(`Correct basis! But the thief isn't in that line. Keep scanning.`);
+      showBasisSelector();
+      if (state.scansLeft <= 0) {
+        state.roundOver = true;
+        setTimeout(() => showRoundResult(false), 600);
+      }
+    }
 
   } else {
-    // Wrong basis — random collapse
-    state.lives -= 1;
-    const randomValue = Math.random() < 0.5 ? '0' : '1';
-
-    el.qubitOrb.classList.add('wrong');
-    el.qubitInner.textContent = `|${randomValue}⟩`;
-    el.qubitLabel.textContent = `Collapsed randomly → |${randomValue}⟩ (not the true state)`;
-
-    el.resultIcon.textContent  = '💥';
-    el.resultTitle.textContent = `Wrong basis — state collapsed.`;
-    el.resultTitle.style.color = 'var(--danger)';
-    el.resultExpl.textContent  = round.wrongMsg;
-
-    // Update lives in HUD immediately
-    el.hudLives.textContent = renderLives(state.lives);
-  }
-
-  // Show result
-  el.resultBox.classList.remove('hidden');
-
-  // Check if game over (no lives left)
-  if (state.lives <= 0) {
-    el.btnNext.textContent = 'See Results →';
-  } else if (state.round >= TOTAL_ROUNDS - 1) {
-    el.btnNext.textContent = 'See Final Score →';
-  } else {
-    el.btnNext.textContent = 'Next Round →';
+    // WRONG BASIS — state collapses, thief teleports
+    wrongBasisCollapse(index, chosen);
   }
 }
 
-// ── Advance to next round or end ──────────────────────────────
-function nextRound() {
-  if (state.lives <= 0) {
-    endGame(false);
-    return;
-  }
+// ── Wrong basis collapse ──────────────────────────────────────
+function wrongBasisCollapse(index, chosenBasis) {
+  // flash the scanned line red
+  const cells = el.grid.querySelectorAll('.cell');
+  cells.forEach(cell => {
+    const r = parseInt(cell.dataset.row);
+    const c = parseInt(cell.dataset.col);
+    if (chosenBasis === 'Z' && r === index) cell.classList.add('wrong-scan');
+    if (chosenBasis === 'X' && c === index) cell.classList.add('wrong-scan');
+  });
 
-  state.round += 1;
+  setStatus('💥 Wrong basis! The quantum state collapsed — thief teleported!', 'error');
 
-  if (state.round >= TOTAL_ROUNDS) {
-    endGame(true);
-    return;
-  }
+  setTimeout(() => {
+    clearHighlights();
 
-  loadRound();
+    // teleport thief to new random location
+    let newRow, newCol;
+    do {
+      newRow = rand(GRID_SIZE);
+      newCol = rand(GRID_SIZE);
+    } while (newRow === state.thief.row && newCol === state.thief.col);
+
+    state.thief = { row: newRow, col: newCol };
+
+    // flip basis randomly (collapse = new state)
+    state.basis = Math.random() < 0.5 ? 'Z' : 'X';
+
+    // regenerate footprints
+    state.footprints = generateFootprints(state.thief, state.basis);
+
+    // re-render grid with new footprints
+    renderGrid();
+
+    // flash new thief cell briefly
+    const newCell = el.grid.querySelector(
+      `.cell[data-row="${state.thief.row}"][data-col="${state.thief.col}"]`
+    );
+    if (newCell) {
+      newCell.classList.add('teleport');
+      setTimeout(() => newCell.classList.remove('teleport'), 400);
+    }
+
+    setStatus('Footprints scrambled. Read them again and choose your basis.', 'error');
+    showBasisSelector();
+
+    if (state.scansLeft <= 0) {
+      state.roundOver = true;
+      setTimeout(() => showRoundResult(false), 800);
+    }
+  }, 600);
 }
 
-// ── End game ──────────────────────────────────────────────────
-function endGame(won) {
+// ── Round result screen ───────────────────────────────────────
+function showRoundResult(caught) {
+  if (caught) {
+    el.resIcon.textContent  = '🚔';
+    el.resTitle.textContent = 'Thief caught!';
+    el.resMsg.textContent   = `You read the footprints correctly and scanned in the right basis. The qubit revealed the true location.`;
+    el.resPhysics.innerHTML =
+      '<strong>What happened:</strong> The thief was encoded in the ' + state.basis +
+      '-basis. Measuring in the same basis is like asking the right question — ' +
+      'the quantum state gave you the true answer without collapsing unpredictably.';
+  } else {
+    el.resIcon.textContent  = '🏃';
+    el.resTitle.textContent = 'Thief escaped.';
+    el.resMsg.textContent   = `You ran out of scans. The wrong basis collapsed the state too many times.`;
+    el.resPhysics.innerHTML =
+      '<strong>What happened:</strong> Each time you chose the wrong basis, the qubit\'s state collapsed — ' +
+      'like rotating your measuring device 90° and losing the original information. ' +
+      'The thief\'s position was destroyed and replaced with a random new state. ' +
+      'This is <em>measurement scrambling</em>: the wrong question destroys the answer.';
+  }
+
+  if (state.round >= MAX_ROUNDS) {
+    el.btnNextRound.textContent = 'See Final Score →';
+  } else {
+    el.btnNextRound.textContent = 'Next Round →';
+  }
+
+  showScreen('result');
+}
+
+// ── Game over ─────────────────────────────────────────────────
+function endGame() {
+  const caught = state.score > 0;
   el.finalScore.textContent = state.score;
 
-  if (won) {
-    el.gameoverIcon.textContent  = '🎉';
-    el.gameoverTitle.textContent = 'You mastered the bases!';
-    el.gameoverMsg.textContent   = `You survived all ${TOTAL_ROUNDS} rounds by asking the right questions.`;
-    el.physicsNote.innerHTML     =
-      '<strong>What you just experienced:</strong> In quantum mechanics, a qubit stores information in a specific basis. ' +
-      'Measuring in a different basis is like asking the wrong question — the qubit can\'t answer honestly, so it ' +
-      'collapses to a random state. This is <em>measurement scrambling</em>, and it\'s why basis choice matters in ' +
-      'quantum cryptography (BB84) and quantum communication.';
-  } else {
-    el.gameoverIcon.textContent  = '💀';
-    el.gameoverTitle.textContent = 'The qubits got you.';
-    el.gameoverMsg.textContent   = 'You ran out of lives. Every wrong basis collapsed a state that couldn\'t be recovered.';
-    el.physicsNote.innerHTML     =
-      '<strong>What went wrong:</strong> Measuring a qubit in the wrong basis destroys the original state permanently — ' +
-      'this is <em>state collapse</em>. Once collapsed, the true value is gone forever. ' +
-      'That irreversibility is one of the strangest things about quantum measurement. ' +
-      'Try again and use the clues to match the basis before you measure.';
-  }
+  el.goIcon.textContent  = state.score >= 300 ? '🏆' : state.score >= 100 ? '🚔' : '😅';
+  el.goTitle.textContent = state.score >= 300 ? 'Master Detective!' : state.score >= 100 ? 'Good work, officer.' : 'The qubits won this time.';
+  el.goMsg.textContent   = `You completed ${MAX_ROUNDS} rounds with a score of ${state.score}.`;
+  el.goPhysics.innerHTML =
+    '<strong>The real physics:</strong> Basis switching is at the heart of quantum cryptography. ' +
+    'In the BB84 protocol, Alice sends qubits encoded in random bases. If Eve intercepts and measures ' +
+    'in the wrong basis, she collapses the state — and Alice and Bob can <em>detect</em> the eavesdropper ' +
+    'by comparing bases afterwards. The wrong question always leaves a trace.';
 
   showScreen('gameover');
 }
 
-// ── Reset and restart ─────────────────────────────────────────
+// ── Reset ─────────────────────────────────────────────────────
 function resetGame() {
-  state.round    = 0;
-  state.score    = 0;
-  state.lives    = MAX_LIVES;
-  state.answered = false;
-  loadRound();
+  state = { round: 0, score: 0 };
+  startNextRound();
+}
+
+function startNextRound() {
+  state.round += 1;
+  initRound();
   showScreen('game');
 }
 
 // ── Event listeners ───────────────────────────────────────────
-el.btnStart.addEventListener('click', () => {
-  resetGame();
+el.btnStart.addEventListener('click', resetGame);
+el.btnHow.addEventListener('click',   () => showScreen('how'));
+el.btnBack.addEventListener('click',  () => showScreen('start'));
+el.btnRestart.addEventListener('click', resetGame);
+
+el.btnZ.addEventListener('click', () => pickBasis('Z'));
+el.btnX.addEventListener('click', () => pickBasis('X'));
+
+el.btnCancel.addEventListener('click', () => {
+  state.selectedBasis = null;
+  clearHighlights();
+  showBasisSelector();
+  setStatus('Basis reset. Choose again.');
 });
 
-el.btnHow.addEventListener('click', () => {
-  showScreen('how');
+el.btnNextRound.addEventListener('click', () => {
+  if (state.round >= MAX_ROUNDS) {
+    endGame();
+  } else {
+    startNextRound();
+  }
 });
 
-el.btnBack.addEventListener('click', () => {
-  showScreen('start');
+// Hover preview on scan buttons — highlight line on hover
+el.scanButtons.addEventListener('mouseover', (e) => {
+  const btn = e.target.closest('.btn-scan');
+  if (btn) highlightLine(parseInt(btn.dataset.index), state.selectedBasis);
 });
 
-el.btnZ.addEventListener('click', () => measure('Z'));
-el.btnX.addEventListener('click', () => measure('X'));
+el.scanButtons.addEventListener('mouseleave', () => clearHighlights());
 
-el.btnNext.addEventListener('click', () => nextRound());
-
-el.btnRestart.addEventListener('click', () => resetGame());
-
-// ── Init ──────────────────────────────────────────────────────
+// ── Boot ──────────────────────────────────────────────────────
 showScreen('start');
